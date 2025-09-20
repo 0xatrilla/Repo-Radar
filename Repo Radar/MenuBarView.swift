@@ -10,7 +10,7 @@ import AppKit
 
 // Simple theme model & picker (Pro unlocks)
 enum AppTheme: String, CaseIterable, Identifiable {
-    case system, blue, green, purple, orange, skyGradient, sunsetGradient, auroraGradient
+    case system, blue, green, purple, orange, skyGradient, sunsetGradient, auroraGradient, oceanGradient, fireGradient, forestGradient
     var id: String { rawValue }
 }
 
@@ -39,9 +39,18 @@ private func themeAccent(_ theme: AppTheme) -> Color {
     case .green: return .green
     case .purple: return .purple
     case .orange: return .orange
-    case .skyGradient: return Color.cyan
-    case .sunsetGradient: return Color.orange
-    case .auroraGradient: return Color.green
+    case .skyGradient, .sunsetGradient, .auroraGradient, .oceanGradient, .fireGradient, .forestGradient:
+        // For gradient themes, return a representative color for compatibility
+        // The actual gradient rendering happens elsewhere with themeGradient()
+        switch theme {
+        case .skyGradient: return .cyan
+        case .sunsetGradient: return .orange
+        case .auroraGradient: return .purple
+        case .oceanGradient: return .teal
+        case .fireGradient: return .red
+        case .forestGradient: return .green
+        default: return .accentColor
+        }
     }
 }
 
@@ -54,8 +63,33 @@ private func themeGradient(_ theme: AppTheme) -> LinearGradient? {
         return LinearGradient(colors: [.pink, .orange], startPoint: .leading, endPoint: .trailing)
     case .auroraGradient:
         return LinearGradient(colors: [.green, .purple], startPoint: .leading, endPoint: .trailing)
+    case .oceanGradient:
+        return LinearGradient(colors: [.blue, .teal, .cyan], startPoint: .topLeading, endPoint: .bottomTrailing)
+    case .fireGradient:
+        return LinearGradient(colors: [.red, .orange, .yellow], startPoint: .bottomLeading, endPoint: .topTrailing)
+    case .forestGradient:
+        return LinearGradient(colors: [.green, .mint, .teal], startPoint: .bottomTrailing, endPoint: .topLeading)
     default:
         return nil
+    }
+}
+
+// Helper to apply gradient to text for gradient themes
+private func gradientText(_ text: String, theme: AppTheme, font: Font) -> some View {
+    Group {
+        if let gradient = themeGradient(theme) {
+            Text(text)
+                .font(font)
+                .overlay(
+                    gradient
+                        .mask(Text(text).font(font))
+                )
+                .foregroundColor(.clear)
+        } else {
+            Text(text)
+                .font(font)
+                .foregroundColor(themeAccent(theme))
+        }
     }
 }
 
@@ -225,9 +259,7 @@ struct RepositoryRow: View {
 
                 HStack(spacing: 8) {
                     if let releaseTag = repository.latestReleaseTag {
-                        Text(releaseTag)
-                            .font(.system(size: 11))
-                            .foregroundColor(themeAccent(selectedTheme))
+                        gradientText(releaseTag, theme: selectedTheme, font: .system(size: 11))
                             .lineLimit(1)
                     } else {
                         Text("No releases")
@@ -241,9 +273,7 @@ struct RepositoryRow: View {
                 Spacer()
 
                 // Star count badge
-                Text("★ \(repository.starCount)")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(themeAccent(selectedTheme))
+                gradientText("★ \(repository.starCount)", theme: selectedTheme, font: .system(size: 12, weight: .semibold))
 
                 Text("More")
                     .font(.system(size: 13, weight: .medium))
@@ -267,8 +297,7 @@ struct RepositoryRow: View {
                             Text("Latest release:")
                                 .font(.system(size: 11))
                                 .foregroundColor(.gray)
-                            Text(tag)
-                                .font(.system(size: 11))
+                            gradientText(tag, theme: selectedTheme, font: .system(size: 11))
                             Text(date, style: .date)
                                 .font(.system(size: 11))
                                 .foregroundColor(.gray)
@@ -283,8 +312,7 @@ struct RepositoryRow: View {
                             Text("Latest issue:")
                                 .font(.system(size: 11))
                                 .foregroundColor(.gray)
-                            Text(issueTitle)
-                                .font(.system(size: 11))
+                            gradientText(issueTitle, theme: selectedTheme, font: .system(size: 11))
                                 .lineLimit(1)
                             Text(issueDate, style: .relative)
                                 .font(.system(size: 11))
