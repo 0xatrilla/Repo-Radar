@@ -40,7 +40,7 @@ struct Repo_RadarApp: App {
             Label {
                 Text("Repo Radar")
             } icon: {
-                if let base = NSImage(named: "menubar")?.resizedForMenuBar(size: NSSize(width: 20, height: 20)) {
+                if let base = NSImage(named: "menubar")?.trimmingTransparentPixels()?.resizedForMenuBar(size: NSSize(width: 18, height: 18)) {
                     Image(nsImage: base)
                         .renderingMode(.template)
                 } else {
@@ -72,5 +72,51 @@ private extension NSImage {
         self.draw(in: rect, from: NSRect(origin: .zero, size: self.size), operation: .sourceOver, fraction: 1.0)
         newImage.isTemplate = true
         return newImage
+    }
+
+    func trimmingTransparentPixels(threshold: UInt8 = 1) -> NSImage? {
+        guard let cg = self.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+
+        let width = cg.width
+        let height = cg.height
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel * width
+        let bitsPerComponent = 8
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+
+        guard let ctx = CGContext(data: nil,
+                                  width: width,
+                                  height: height,
+                                  bitsPerComponent: bitsPerComponent,
+                                  bytesPerRow: bytesPerRow,
+                                  space: colorSpace,
+                                  bitmapInfo: bitmapInfo.rawValue) else { return nil }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+        guard let data = ctx.data else { return nil }
+
+        let ptr = data.bindMemory(to: UInt8.self, capacity: width * height * bytesPerPixel)
+
+        var minX = width, minY = height, maxX = 0, maxY = 0
+        for y in 0..<height {
+            for x in 0..<width {
+                let idx = y * bytesPerRow + x * bytesPerPixel
+                let alpha = ptr[idx + 3]
+                if alpha > threshold {
+                    if x < minX { minX = x }
+                    if x > maxX { maxX = x }
+                    if y < minY { minY = y }
+                    if y > maxY { maxY = y }
+                }
+            }
+        }
+
+        if maxX <= minX || maxY <= minY { return self }
+
+        let cropRect = CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+        guard let fullImage = ctx.makeImage(), let cropped = fullImage.cropping(to: cropRect) else { return nil }
+        let result = NSImage(cgImage: cropped, size: NSSize(width: cropRect.width, height: cropRect.height))
+        result.isTemplate = true
+        return result
     }
 }

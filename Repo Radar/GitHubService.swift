@@ -258,8 +258,8 @@ class GitHubService {
     }
 
     func fetchLatestIssue(owner: String, name: String) async throws -> Issue? {
-        // Query open and closed issues; exclude PRs by using issues endpoint and filter by most recent
-        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(name)/issues?per_page=5&state=all&sort=created&direction=desc") else { throw GitHubError.invalidURL }
+        // Query open and closed issues; exclude PRs via filter and prefer updated sorting
+        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(name)/issues?per_page=10&state=all&sort=updated&direction=desc") else { throw GitHubError.invalidURL }
         let request = makeRequest(url: url)
         do {
             let (data, response) = try await session.data(for: request)
