@@ -245,6 +245,48 @@ class GitHubService {
         let stargazersCount: Int
     }
 
+    // MARK: - Issues
+    struct Issue: Codable {
+        let title: String
+        let htmlUrl: String
+        let createdAt: String
+        let pullRequest: PullRequestRef?
+
+        struct PullRequestRef: Codable {
+            let url: String
+        }
+    }
+
+    func fetchLatestIssue(owner: String, name: String) async throws -> Issue? {
+        // Query open and closed issues; exclude PRs by using issues endpoint and filter by most recent
+        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(name)/issues?per_page=5&state=all&sort=created&direction=desc") else { throw GitHubError.invalidURL }
+        let request = makeRequest(url: url)
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse else { throw GitHubError.invalidResponse }
+            switch http.statusCode {
+            case 200:
+                let decoder = JSONDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                let issues = try decoder.decode([Issue].self, from: data)
+                // Filter out PRs (GitHub returns PRs in issues list when not filtered)
+                return issues.first(where: { $0.pullRequest == nil })
+            case 404:
+                return nil
+            case 401:
+                throw GitHubError.invalidToken
+            case 403:
+                throw GitHubError.rateLimited
+            default:
+                let message = parseErrorMessage(from: data)
+                throw GitHubError.httpError(status: http.statusCode, message: message)
+            }
+        } catch {
+            if let gh = error as? GitHubError { throw gh }
+            throw GitHubError.networkError(error)
+        }
+    }
+
     func fetchUserRepos(page: Int = 1, perPage: Int = 50) async throws -> [UserRepoSummary] {
         guard perPage <= 100 else { return try await fetchUserRepos(page: page, perPage: 100) }
         // Include owned, collaborator and org repos; include private if scope allows
@@ -289,6 +331,8 @@ class GitHubService {
 
             // Fetch latest release
             let release = try await fetchLatestRelease(owner: repository.owner, name: repository.name)
+            // Fetch latest issue
+            let latestIssue = try? await fetchLatestIssue(owner: repository.owner, name: repository.name)
 
             // Update repository data
             repository.previousStarCount = repository.starCount
@@ -308,7 +352,11 @@ class GitHubService {
                 repository.latestReleaseDate = nil
             }
 
-            // No latest stargazer handling (feature removed)
+            if let issue = latestIssue {
+                repository.latestIssueTitle = issue.title
+                let formatter = ISO8601DateFormatter()
+                repository.latestIssueDate = formatter.date(from: issue.createdAt)
+            }
 
         } catch {
             throw error

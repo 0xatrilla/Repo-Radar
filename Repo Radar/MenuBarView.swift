@@ -13,7 +13,7 @@ struct MenuBarView: View {
     @State private var showingAddRepo = false
     @State private var newRepoInput = ""
     @State private var inlineAddOpen = false
-    @State private var showingImport = false
+    @State private var showingImport = false // legacy (sheet removed)
 
     var body: some View {
         VStack(spacing: 0) {
@@ -93,6 +93,14 @@ struct MenuBarView: View {
                 }
 
                 HStack {
+                    Button(action: { NSApplication.shared.terminate(nil) }) {
+                        HStack {
+                            Image(systemName: "power")
+                            Text("Quit")
+                        }
+                    }
+                    .buttonStyle(.plain)
+
                     Button(action: { Task { await viewModel.refreshRepositories() } }) {
                         HStack {
                             Image(systemName: "arrow.clockwise")
@@ -106,7 +114,7 @@ struct MenuBarView: View {
 
                     Button(action: {
                         if Settings.shared.personalAccessToken?.isEmpty == false {
-                            showingImport = true
+                            openWindow(id: "import")
                         } else {
                             openWindow(id: "settings")
                         }
@@ -131,9 +139,7 @@ struct MenuBarView: View {
             }
         }
         .frame(width: 380)
-        .sheet(isPresented: $showingImport) {
-            ImportMyReposView(viewModel: viewModel, isPresented: $showingImport)
-        }
+        // Import presented as dedicated window now
     }
 }
 
@@ -174,6 +180,11 @@ struct RepositoryRow: View {
 
                 Spacer()
 
+                // Star count badge
+                Text("★ \(repository.starCount)")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.green)
+
                 Text("More")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.gray)
@@ -207,6 +218,23 @@ struct RepositoryRow: View {
                         }
                     }
 
+                    if let issueTitle = repository.latestIssueTitle, let issueDate = repository.latestIssueDate {
+                        HStack(spacing: 8) {
+                            Text("Latest issue:")
+                                .font(.system(size: 11))
+                                .foregroundColor(.gray)
+                            Text(issueTitle)
+                                .font(.system(size: 11))
+                                .lineLimit(1)
+                            Text(issueDate, style: .relative)
+                                .font(.system(size: 11))
+                                .foregroundColor(.gray)
+                        }
+                        .onTapGesture {
+                            if let url = URL(string: "https://github.com/\(repository.displayName)/issues") { NSWorkspace.shared.open(url) }
+                        }
+                    }
+
                     HStack(spacing: 12) {
                         Button("Open Repo") {
                             if let url = URL(string: repository.url) { NSWorkspace.shared.open(url) }
@@ -222,6 +250,19 @@ struct RepositoryRow: View {
                             if let url = URL(string: "https://github.com/\(repository.displayName)/releases") { NSWorkspace.shared.open(url) }
                         }
                         .buttonStyle(.link)
+
+                        Button("Issues") {
+                            if let url = URL(string: "https://github.com/\(repository.displayName)/issues") { NSWorkspace.shared.open(url) }
+                        }
+                        .buttonStyle(.link)
+
+                        Spacer()
+
+                        Button("Remove") {
+                            viewModel.removeRepository(repository)
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundColor(.red)
                     }
                 }
             }
@@ -513,54 +554,71 @@ struct ImportMyReposView: View {
             TextField("Search", text: $search)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
 
-            if isLoading {
-                HStack { ProgressView(); Text("Loading...") }
-            } else if let errorMessage = errorMessage {
-                Text(errorMessage).foregroundColor(.red)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(filtered, id: \.id) { repo in
-                            HStack {
-                                Toggle(isOn: Binding(
-                                    get: { selected.contains(repo.id) },
-                                    set: { newVal in
-                                        if newVal { selected.insert(repo.id) } else { selected.remove(repo.id) }
-                                    }
-                                )) { EmptyView() }
-                                .toggleStyle(.checkbox)
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.gray.opacity(0.08))
+                    .opacity(0) // keep background transparent but reserve space
+                if isLoading {
+                    HStack { ProgressView(); Text("Loading...") }
+                        .padding(.top, 8)
+                } else if let errorMessage = errorMessage {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(errorMessage).foregroundColor(.red)
+                        Button("Retry") { Task { await load() } }
+                    }
+                    .padding(.top, 8)
+                } else {
+                    if filtered.isEmpty {
+                        Text("No repositories found")
+                            .foregroundColor(.gray)
+                            .padding(.top, 8)
+                    } else {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(filtered, id: \.id) { repo in
+                                    HStack {
+                                        Toggle(isOn: Binding(
+                                            get: { selected.contains(repo.id) },
+                                            set: { newVal in
+                                                if newVal { selected.insert(repo.id) } else { selected.remove(repo.id) }
+                                            }
+                                        )) { EmptyView() }
+                                        .toggleStyle(.checkbox)
 
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(repo.fullName)
-                                        .font(.system(size: 12, weight: .medium))
-                                    Text("★ \(repo.stargazersCount)")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.gray)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(repo.fullName)
+                                                .font(.system(size: 12, weight: .medium))
+                                            Text("★ \(repo.stargazersCount)")
+                                                .font(.system(size: 11))
+                                                .foregroundColor(.gray)
+                                        }
+                                        Spacer()
+                                        Button("Open") {
+                                            if let url = URL(string: repo.htmlUrl) { NSWorkspace.shared.open(url) }
+                                        }
+                                        .buttonStyle(.link)
+                                    }
+                                    .padding(.vertical, 4)
                                 }
-                                Spacer()
-                                Button("Open") {
-                                    if let url = URL(string: repo.htmlUrl) { NSWorkspace.shared.open(url) }
-                                }
-                                .buttonStyle(.link)
                             }
-                            .padding(.vertical, 4)
                         }
                     }
-                    .frame(maxHeight: 300)
                 }
-
-                HStack {
-                    Spacer()
-                    Button("Import (\(selected.count))") {
-                        Task { await importSelected() }
-                    }
-                    .disabled(selected.isEmpty)
+            }
+            .frame(height: 320)
+            
+            HStack {
+                Spacer()
+                Button("Import (\(selected.count))") {
+                    Task { await importSelected() }
                 }
+                .disabled(selected.isEmpty)
             }
         }
         .padding()
         .frame(width: 480)
         .task { await load() }
+        .onAppear { Task { await load() } }
     }
 
     private func load() async {
@@ -585,5 +643,19 @@ struct ImportMyReposView: View {
             await viewModel.addRepository(from: "\(owner)/\(name)")
         }
         isPresented = false
+    }
+}
+
+// Window wrapper so ImportMyReposView can be shown in a Window scene
+struct ImportMyReposWindow: View {
+    let viewModel: RepoRadarViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var isPresented = true
+
+    var body: some View {
+        ImportMyReposView(viewModel: viewModel, isPresented: $isPresented)
+            .onChange(of: isPresented) { _, newValue in
+                if newValue == false { dismiss() }
+            }
     }
 }

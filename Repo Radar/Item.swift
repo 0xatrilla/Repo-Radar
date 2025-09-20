@@ -24,6 +24,8 @@ final class Repository {
     var lastChecked: Date
     var latestStarUser: String?
     var latestStarDate: Date?
+    var latestIssueTitle: String?
+    var latestIssueDate: Date?
 
     init(owner: String, name: String, fullName: String, url: String) {
         self.owner = owner
