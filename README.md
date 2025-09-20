@@ -71,21 +71,6 @@ A sleek macOS menu bar app that keeps you updated on your favorite GitHub reposi
 
 This is a personal project by a solo developer. Feature requests and bug reports are welcome!
 
-### Development Setup
-```bash
-# Clone the repository
-git clone <repository-url>
-
-# Open in Xcode
-open "Repo Radar.xcodeproj"
-
-# Build and run
-# The app requires macOS 15.0+ and Xcode 16.0+
-```
-
-## License
-
-This project is developed and maintained by Callum Matthews.
 
 ## Support
 
