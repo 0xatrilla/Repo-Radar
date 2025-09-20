@@ -1,3 +1,7 @@
+
+<img width="250" height="250" alt="AppIcon1-iOS-Default-1024x1024@1x" src="https://github.com/user-attachments/assets/2b70e294-e40b-4a3d-bd79-1aabda8b530b" />
+
+
 # Repo Radar
 
 A sleek macOS menu bar app that keeps you updated on your favorite GitHub repositories. Get instant notifications for new releases, stars, and issues without leaving your workflow.
