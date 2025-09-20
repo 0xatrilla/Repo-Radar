@@ -215,6 +215,7 @@ struct RepositoryRow: View {
     @State private var expanded = false
 
     var body: some View {
+        let selectedTheme = AppTheme(rawValue: UserDefaults.standard.string(forKey: "appTheme") ?? AppTheme.system.rawValue) ?? .system
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
@@ -226,7 +227,7 @@ struct RepositoryRow: View {
                     if let releaseTag = repository.latestReleaseTag {
                         Text(releaseTag)
                             .font(.system(size: 11))
-                            .foregroundColor(themeAccent(AppTheme(rawValue: UserDefaults.standard.string(forKey: "appTheme") ?? AppTheme.system.rawValue) ?? .system))
+                            .foregroundColor(themeAccent(selectedTheme))
                             .lineLimit(1)
                     } else {
                         Text("No releases")
@@ -242,7 +243,7 @@ struct RepositoryRow: View {
                 // Star count badge
                 Text("★ \(repository.starCount)")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(themeAccent(AppTheme(rawValue: UserDefaults.standard.string(forKey: "appTheme") ?? AppTheme.system.rawValue) ?? .system))
+                    .foregroundColor(themeAccent(selectedTheme))
 
                 Text("More")
                     .font(.system(size: 13, weight: .medium))
@@ -395,6 +396,7 @@ struct SettingsSheet: View {
     @State private var verifying = false
     private let service = GitHubService()
     @ObservedObject private var pro = ProManager.shared
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(spacing: 20) {
@@ -546,6 +548,7 @@ struct SettingsWindowView: View {
     @State private var verifying = false
     private let service = GitHubService()
     @ObservedObject private var pro = ProManager.shared
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(spacing: 20) {
