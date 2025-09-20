@@ -183,27 +183,56 @@ class RepoRadarViewModel: ObservableObject {
             if settings.notifyOnRelease,
                repository.hasNewRelease,
                let releaseTag = repository.latestReleaseTag {
-
                 let content = UNMutableNotificationContent()
                 content.title = "New Release: \(repository.displayName)"
                 content.body = "Released \(releaseTag)"
                 content.sound = UNNotificationSound.default
                 content.userInfo = ["url": repository.url]
-
                 let request = UNNotificationRequest(
                     identifier: "release-\(repository.id)",
                     content: content,
                     trigger: nil
                 )
-
-                do {
-                    try await center.add(request)
-                } catch {
-                    print("Failed to send notification: \(error.localizedDescription)")
-                }
+                do { try await center.add(request) } catch { print("Failed to send notification: \(error.localizedDescription)") }
             }
 
-            // Future: star/issue notifications could be added here when we track deltas
+            // Star notifications
+            if settings.notifyOnStar, repository.starDelta > 0 {
+                let content = UNMutableNotificationContent()
+                content.title = "Stars: \(repository.displayName)"
+                content.body = "+\(repository.starDelta) new star\(repository.starDelta == 1 ? "" : "s")"
+                content.sound = UNNotificationSound.default
+                let starsURL = "https://github.com/\(repository.displayName)/stargazers"
+                content.userInfo = ["url": starsURL]
+                let request = UNNotificationRequest(
+                    identifier: "stars-\(repository.id)-\(Int(Date().timeIntervalSince1970))",
+                    content: content,
+                    trigger: nil
+                )
+                do { try await center.add(request) } catch { print("Failed to send star notification: \(error.localizedDescription)") }
+            }
+
+            // Issue notifications
+            if settings.notifyOnIssue,
+               let issueDate = repository.latestIssueDate,
+               issueDate > repository.lastChecked,
+               let title = repository.latestIssueTitle {
+                let content = UNMutableNotificationContent()
+                content.title = "New Issue: \(repository.displayName)"
+                content.body = title
+                content.sound = UNNotificationSound.default
+                let issuesURL = "https://github.com/\(repository.displayName)/issues"
+                content.userInfo = ["url": issuesURL]
+                let request = UNNotificationRequest(
+                    identifier: "issue-\(repository.id)-\(Int(Date().timeIntervalSince1970))",
+                    content: content,
+                    trigger: nil
+                )
+                do { try await center.add(request) } catch { print("Failed to send issue notification: \(error.localizedDescription)") }
+            }
+
+            // Update lastChecked per repo after evaluating notifications
+            repository.lastChecked = Date()
         }
     }
 

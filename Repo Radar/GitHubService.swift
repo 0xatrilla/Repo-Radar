@@ -267,60 +267,43 @@ class GitHubService {
     }
 
     func fetchLatestIssue(owner: String, name: String) async throws -> Issue? {
-        // 1) Prefer Search API to guarantee PRs are excluded (is:issue)
-        if let searchURL = URL(string: "\(baseURL)/search/issues?q=repo:\(owner)/\(name)+is:issue&sort=created&order=desc&per_page=1") {
-            let request = makeRequest(url: searchURL)
+        // Build Search API URL with percent-encoded query to guarantee is:issue
+        var comps = URLComponents(string: "\(baseURL)/search/issues")
+        comps?.queryItems = [
+            URLQueryItem(name: "q", value: "repo:\(owner)/\(name) is:issue"),
+            URLQueryItem(name: "sort", value: "created"),
+            URLQueryItem(name: "order", value: "desc"),
+            URLQueryItem(name: "per_page", value: "1")
+        ]
+        if let url = comps?.url {
+            let request = makeRequest(url: url)
             do {
                 let (data, response) = try await session.data(for: request)
-                if let http = response as? HTTPURLResponse {
-                    switch http.statusCode {
-                    case 200:
-                        let decoder = JSONDecoder()
-                        decoder.keyDecodingStrategy = .convertFromSnakeCase
-                        let res = try decoder.decode(SearchIssuesResponse.self, from: data)
-                        if let item = res.items.first {
-                            return Issue(title: item.title, htmlUrl: item.htmlUrl, createdAt: item.createdAt, pullRequest: nil)
-                        } else {
-                            return nil
-                        }
-                    case 401: throw GitHubError.invalidToken
-                    case 403: break // fall back to issues endpoint (search is more restricted)
-                    default:
-                        // If search fails for any other reason, fall back
-                        break
+                guard let http = response as? HTTPURLResponse else { throw GitHubError.invalidResponse }
+                switch http.statusCode {
+                case 200:
+                    let decoder = JSONDecoder()
+                    decoder.keyDecodingStrategy = .convertFromSnakeCase
+                    let res = try decoder.decode(SearchIssuesResponse.self, from: data)
+                    if let item = res.items.first {
+                        return Issue(title: item.title, htmlUrl: item.htmlUrl, createdAt: item.createdAt, pullRequest: nil)
                     }
+                    return nil
+                case 401:
+                    throw GitHubError.invalidToken
+                case 403:
+                    // If search is rate-limited, avoid showing wrong data; skip silently
+                    return nil
+                default:
+                    let message = parseErrorMessage(from: data)
+                    throw GitHubError.httpError(status: http.statusCode, message: message)
                 }
             } catch {
-                // Fall through to issues endpoint on any error
+                if let gh = error as? GitHubError { throw gh }
+                throw GitHubError.networkError(error)
             }
         }
-
-        // 2) Fallback: Issues endpoint (filter PRs client-side)
-        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(name)/issues?per_page=10&state=all&sort=created&direction=desc") else { throw GitHubError.invalidURL }
-        let request = makeRequest(url: url)
-        do {
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else { throw GitHubError.invalidResponse }
-            switch http.statusCode {
-            case 200:
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let issues = try decoder.decode([Issue].self, from: data)
-                return issues.first(where: { $0.pullRequest == nil })
-            case 404:
-                return nil
-            case 401:
-                throw GitHubError.invalidToken
-            case 403:
-                throw GitHubError.rateLimited
-            default:
-                let message = parseErrorMessage(from: data)
-                throw GitHubError.httpError(status: http.statusCode, message: message)
-            }
-        } catch {
-            if let gh = error as? GitHubError { throw gh }
-            throw GitHubError.networkError(error)
-        }
+        return nil
     }
 
     func fetchUserRepos(page: Int = 1, perPage: Int = 50) async throws -> [UserRepoSummary] {
