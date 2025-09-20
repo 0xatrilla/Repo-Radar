@@ -379,6 +379,12 @@ struct SettingsSheet: View {
 
                 // Notifications
                 Toggle("Enable Notifications", isOn: $settings.notificationsEnabled)
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("Releases", isOn: $settings.notifyOnRelease)
+                    Toggle("Stars", isOn: $settings.notifyOnStar)
+                    Toggle("Issues", isOn: $settings.notifyOnIssue)
+                }
+                .padding(.leading, 18)
 
                 Divider()
 
@@ -421,6 +427,11 @@ struct SettingsSheet: View {
                         }
                     }
                 }
+
+                Divider()
+
+                // Launch at login
+                Toggle("Launch at login", isOn: $settings.launchAtLogin)
             }
             .padding(.horizontal)
 
@@ -476,6 +487,12 @@ struct SettingsWindowView: View {
                 }
 
                 Toggle("Enable Notifications", isOn: $settings.notificationsEnabled)
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("Releases", isOn: $settings.notifyOnRelease)
+                    Toggle("Stars", isOn: $settings.notifyOnStar)
+                    Toggle("Issues", isOn: $settings.notifyOnIssue)
+                }
+                .padding(.leading, 18)
 
                 Divider()
 
@@ -515,6 +532,10 @@ struct SettingsWindowView: View {
                         }
                     }
                 }
+
+                Divider()
+
+                Toggle("Launch at login", isOn: $settings.launchAtLogin)
             }
             .padding(.horizontal)
 

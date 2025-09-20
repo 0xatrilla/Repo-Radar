@@ -169,17 +169,19 @@ class RepoRadarViewModel: ObservableObject {
             isLoading = false
         }
 
-        // Check for new releases and send notifications
-        await checkForNewReleases()
+        // Notifications
+        await postNotificationsIfNeeded()
     }
 
-    private func checkForNewReleases() async {
+    private func postNotificationsIfNeeded() async {
         guard settings.notificationsEnabled else { return }
 
         let center = UNUserNotificationCenter.current()
 
         for repository in repositories {
-            if repository.hasNewRelease,
+            // Release notifications
+            if settings.notifyOnRelease,
+               repository.hasNewRelease,
                let releaseTag = repository.latestReleaseTag {
 
                 let content = UNMutableNotificationContent()
@@ -200,6 +202,8 @@ class RepoRadarViewModel: ObservableObject {
                     print("Failed to send notification: \(error.localizedDescription)")
                 }
             }
+
+            // Future: star/issue notifications could be added here when we track deltas
         }
     }
 
