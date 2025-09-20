@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 
 struct MenuBarView: View {
     @ObservedObject var viewModel: RepoRadarViewModel
@@ -114,9 +115,13 @@ struct MenuBarView: View {
 
                     Button(action: {
                         if Settings.shared.personalAccessToken?.isEmpty == false {
+                            NSApplication.shared.activate(ignoringOtherApps: true)
                             openWindow(id: "import")
+                            bringWindowToFront(title: "Import My Repos")
                         } else {
+                            NSApplication.shared.activate(ignoringOtherApps: true)
                             openWindow(id: "settings")
+                            bringWindowToFront(title: "Settings")
                         }
                     }) {
                         HStack {
@@ -126,7 +131,11 @@ struct MenuBarView: View {
                     }
                     .buttonStyle(.plain)
 
-                    Button(action: { openWindow(id: "settings") }) {
+                    Button(action: {
+                        NSApplication.shared.activate(ignoringOtherApps: true)
+                        openWindow(id: "settings")
+                        bringWindowToFront(title: "Settings")
+                    }) {
                         HStack {
                             Image(systemName: "gear")
                             Text("Settings")
@@ -141,6 +150,11 @@ struct MenuBarView: View {
         .frame(width: 380)
         // Import presented as dedicated window now
     }
+}
+
+// MARK: - Window helpers
+private func bringWindowToFront(title: String) {
+    NSApplication.shared.windows.first(where: { $0.title == title })?.makeKeyAndOrderFront(nil)
 }
 
 struct RepositoryRow: View {

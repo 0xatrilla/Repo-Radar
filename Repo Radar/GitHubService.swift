@@ -257,9 +257,46 @@ class GitHubService {
         }
     }
 
+    private struct SearchIssuesResponse: Codable {
+        struct Item: Codable {
+            let title: String
+            let htmlUrl: String
+            let createdAt: String
+        }
+        let items: [Item]
+    }
+
     func fetchLatestIssue(owner: String, name: String) async throws -> Issue? {
-        // Query open and closed issues; exclude PRs via filter and prefer updated sorting
-        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(name)/issues?per_page=10&state=all&sort=updated&direction=desc") else { throw GitHubError.invalidURL }
+        // 1) Prefer Search API to guarantee PRs are excluded (is:issue)
+        if let searchURL = URL(string: "\(baseURL)/search/issues?q=repo:\(owner)/\(name)+is:issue&sort=created&order=desc&per_page=1") {
+            let request = makeRequest(url: searchURL)
+            do {
+                let (data, response) = try await session.data(for: request)
+                if let http = response as? HTTPURLResponse {
+                    switch http.statusCode {
+                    case 200:
+                        let decoder = JSONDecoder()
+                        decoder.keyDecodingStrategy = .convertFromSnakeCase
+                        let res = try decoder.decode(SearchIssuesResponse.self, from: data)
+                        if let item = res.items.first {
+                            return Issue(title: item.title, htmlUrl: item.htmlUrl, createdAt: item.createdAt, pullRequest: nil)
+                        } else {
+                            return nil
+                        }
+                    case 401: throw GitHubError.invalidToken
+                    case 403: break // fall back to issues endpoint (search is more restricted)
+                    default:
+                        // If search fails for any other reason, fall back
+                        break
+                    }
+                }
+            } catch {
+                // Fall through to issues endpoint on any error
+            }
+        }
+
+        // 2) Fallback: Issues endpoint (filter PRs client-side)
+        guard let url = URL(string: "\(baseURL)/repos/\(owner)/\(name)/issues?per_page=10&state=all&sort=created&direction=desc") else { throw GitHubError.invalidURL }
         let request = makeRequest(url: url)
         do {
             let (data, response) = try await session.data(for: request)
@@ -269,7 +306,6 @@ class GitHubService {
                 let decoder = JSONDecoder()
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
                 let issues = try decoder.decode([Issue].self, from: data)
-                // Filter out PRs (GitHub returns PRs in issues list when not filtered)
                 return issues.first(where: { $0.pullRequest == nil })
             case 404:
                 return nil
