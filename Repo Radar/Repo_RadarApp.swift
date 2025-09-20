@@ -59,6 +59,11 @@ struct Repo_RadarApp: App {
             ImportMyReposWindow(viewModel: viewModel)
                 .frame(width: 520, height: 480)
         }
+
+        Window("Get Pro", id: "pro") {
+            ProPaywallView()
+                .frame(width: 520, height: 520)
+        }
     }
 }
 

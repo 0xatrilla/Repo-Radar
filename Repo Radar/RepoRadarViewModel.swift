@@ -19,6 +19,7 @@ class RepoRadarViewModel: ObservableObject {
     private let modelContext: ModelContext
     private let gitHubService = GitHubService()
     private var settings = Settings.shared
+    private let pro = ProManager.shared
     private var timer: Timer?
     private var cancellables = Set<AnyCancellable>()
 
@@ -69,6 +70,14 @@ class RepoRadarViewModel: ObservableObject {
         }
 
         do {
+            // Gate free users at 3 repositories
+            if !pro.isSubscribed && repositories.count >= 3 {
+                await MainActor.run {
+                    errorMessage = "Free plan limit reached. Get Pro to track more than 3 repos."
+                    isLoading = false
+                }
+                return
+            }
             // Parse repository input
             print("About to parse input: \(input)")
             let (owner, name) = try parseRepositoryInput(input)

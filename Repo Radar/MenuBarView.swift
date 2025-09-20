@@ -8,6 +8,57 @@
 import SwiftUI
 import AppKit
 
+// Simple theme model & picker (Pro unlocks)
+enum AppTheme: String, CaseIterable, Identifiable {
+    case system, blue, green, purple, orange, skyGradient, sunsetGradient, auroraGradient
+    var id: String { rawValue }
+}
+
+struct ThemePicker: View {
+    @AppStorage("appTheme") private var themeRaw: String = AppTheme.system.rawValue
+    private var theme: AppTheme { AppTheme(rawValue: themeRaw) ?? .system }
+
+    var body: some View {
+        Picker("Theme", selection: Binding(
+            get: { theme },
+            set: { themeRaw = $0.rawValue }
+        )) {
+            ForEach(AppTheme.allCases) { t in
+                Text(t.rawValue.capitalized).tag(t)
+            }
+        }
+        .pickerStyle(.menu)
+    }
+}
+
+// Simple palette helper
+private func themeAccent(_ theme: AppTheme) -> Color {
+    switch theme {
+    case .system: return .accentColor
+    case .blue: return .blue
+    case .green: return .green
+    case .purple: return .purple
+    case .orange: return .orange
+    case .skyGradient: return Color.cyan
+    case .sunsetGradient: return Color.orange
+    case .auroraGradient: return Color.green
+    }
+}
+
+// For gradient themes, provide a background modifier
+private func themeGradient(_ theme: AppTheme) -> LinearGradient? {
+    switch theme {
+    case .skyGradient:
+        return LinearGradient(colors: [.blue, .cyan], startPoint: .leading, endPoint: .trailing)
+    case .sunsetGradient:
+        return LinearGradient(colors: [.pink, .orange], startPoint: .leading, endPoint: .trailing)
+    case .auroraGradient:
+        return LinearGradient(colors: [.green, .purple], startPoint: .leading, endPoint: .trailing)
+    default:
+        return nil
+    }
+}
+
 struct MenuBarView: View {
     @ObservedObject var viewModel: RepoRadarViewModel
     @Environment(\.openWindow) private var openWindow
@@ -175,19 +226,13 @@ struct RepositoryRow: View {
                     if let releaseTag = repository.latestReleaseTag {
                         Text(releaseTag)
                             .font(.system(size: 11))
-                            .foregroundColor(.blue)
+                            .foregroundColor(themeAccent(AppTheme(rawValue: UserDefaults.standard.string(forKey: "appTheme") ?? AppTheme.system.rawValue) ?? .system))
                             .lineLimit(1)
                     } else {
                         Text("No releases")
                             .font(.system(size: 11))
                             .foregroundColor(.gray)
                             .lineLimit(1)
-                    }
-
-                    if repository.starDelta > 0 {
-                        Text("+\(repository.starDelta)")
-                            .font(.system(size: 11))
-                            .foregroundColor(.green)
                     }
                 }
                 }
@@ -197,7 +242,7 @@ struct RepositoryRow: View {
                 // Star count badge
                 Text("★ \(repository.starCount)")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.green)
+                    .foregroundColor(themeAccent(AppTheme(rawValue: UserDefaults.standard.string(forKey: "appTheme") ?? AppTheme.system.rawValue) ?? .system))
 
                 Text("More")
                     .font(.system(size: 13, weight: .medium))
@@ -349,6 +394,7 @@ struct SettingsSheet: View {
     @State private var verifyMessage: String?
     @State private var verifying = false
     private let service = GitHubService()
+    @ObservedObject private var pro = ProManager.shared
 
     var body: some View {
         VStack(spacing: 20) {
@@ -356,6 +402,14 @@ struct SettingsSheet: View {
                 Text("Settings")
                     .font(.headline)
                 Spacer()
+                if !pro.isSubscribed {
+                    Button(pro.isPurchasing ? "Purchasing…" : "Get Pro") {
+                        NSApplication.shared.activate(ignoringOtherApps: true)
+                        openWindow(id: "pro")
+                        bringWindowToFront(title: "Get Pro")
+                    }
+                    .disabled(pro.isPurchasing)
+                }
                 Button("Done") { isPresented = false }
                     .keyboardShortcut(.defaultAction)
             }
@@ -432,6 +486,33 @@ struct SettingsSheet: View {
 
                 // Launch at login
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
+
+                // Restore purchases
+                if !pro.isSubscribed {
+                    Button("Restore Purchases") { Task { try? await pro.restorePurchases() } }
+                        .buttonStyle(.link)
+                }
+
+                Divider()
+
+                // Themes (Pro)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Theme")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        if !pro.isSubscribed {
+                            Text("Pro")
+                                .font(.caption2)
+                                .padding(4)
+                                .background(Color.yellow.opacity(0.3))
+                                .cornerRadius(4)
+                        }
+                    }
+                    ThemePicker()
+                        .disabled(!pro.isSubscribed)
+                        .opacity(pro.isSubscribed ? 1.0 : 0.5)
+                }
             }
             .padding(.horizontal)
 
@@ -464,13 +545,19 @@ struct SettingsWindowView: View {
     @State private var verifyMessage: String?
     @State private var verifying = false
     private let service = GitHubService()
+    @ObservedObject private var pro = ProManager.shared
 
     var body: some View {
         VStack(spacing: 20) {
             HStack {
                 Text("Settings").font(.headline)
                 Spacer()
-                // No close button here; window managed by system titlebar
+                if !pro.isSubscribed {
+                    Button(pro.isPurchasing ? "Purchasing…" : "Get Pro") {
+                        Task { try? await pro.purchasePro() }
+                    }
+                    .disabled(pro.isPurchasing)
+                }
             }
 
             VStack(alignment: .leading, spacing: 16) {
@@ -536,6 +623,28 @@ struct SettingsWindowView: View {
                 Divider()
 
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Theme").font(.subheadline).fontWeight(.medium)
+                        if !pro.isSubscribed {
+                            Text("Pro").font(.caption2)
+                                .padding(4)
+                                .background(Color.yellow.opacity(0.3))
+                                .cornerRadius(4)
+                        }
+                    }
+                    ThemePicker()
+                        .disabled(!pro.isSubscribed)
+                        .opacity(pro.isSubscribed ? 1.0 : 0.5)
+                }
+
+                if !pro.isSubscribed {
+                    Button("Restore Purchases") { Task { try? await pro.restorePurchases() } }
+                        .buttonStyle(.link)
+                }
             }
             .padding(.horizontal)
 
