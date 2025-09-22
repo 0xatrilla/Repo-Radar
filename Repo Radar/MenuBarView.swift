@@ -525,6 +525,31 @@ struct SettingsSheet: View {
 
                 Divider()
 
+                // Legal Links
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Legal")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    HStack(spacing: 16) {
+                        Button("Terms of Use") {
+                            if let url = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .buttonStyle(.link)
+                        
+                        Button("Privacy Policy") {
+                            if let url = URL(string: "https://github.com/0xatrilla/Repo-Radar/blob/main/PRIVACY_POLICY.md") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .buttonStyle(.link)
+                    }
+                }
+
+                Divider()
+
                 // Themes (Pro)
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
@@ -585,7 +610,9 @@ struct SettingsWindowView: View {
                 Spacer()
                 if !pro.isSubscribed {
                     Button(pro.isPurchasing ? "Purchasing…" : "Get Pro") {
-                        Task { try? await pro.purchasePro() }
+                        NSApplication.shared.activate(ignoringOtherApps: true)
+                        openWindow(id: "pro")
+                        bringWindowToFront(title: "Get Pro")
                     }
                     .disabled(pro.isPurchasing)
                 }
@@ -675,6 +702,31 @@ struct SettingsWindowView: View {
                 if !pro.isSubscribed {
                     Button("Restore Purchases") { Task { try? await pro.restorePurchases() } }
                         .buttonStyle(.link)
+                }
+
+                Divider()
+
+                // Legal Links
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Legal")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    HStack(spacing: 16) {
+                        Button("Terms of Use") {
+                            if let url = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .buttonStyle(.link)
+                        
+                        Button("Privacy Policy") {
+                            if let url = URL(string: "https://github.com/0xatrilla/Repo-Radar/blob/main/PRIVACY_POLICY.md") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .buttonStyle(.link)
+                    }
                 }
             }
             .padding(.horizontal)
