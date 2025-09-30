@@ -43,6 +43,19 @@ class Settings: ObservableObject {
         didSet { UserDefaults.standard.set(notifyOnIssue, forKey: "notifyOnIssue") }
     }
 
+    // Pro analytics notifications
+    @Published var notifyOnHealthChange: Bool {
+        didSet { UserDefaults.standard.set(notifyOnHealthChange, forKey: "notifyOnHealthChange") }
+    }
+
+    @Published var notifyOnActivitySpike: Bool {
+        didSet { UserDefaults.standard.set(notifyOnActivitySpike, forKey: "notifyOnActivitySpike") }
+    }
+
+    @Published var notifyOnMilestone: Bool {
+        didSet { UserDefaults.standard.set(notifyOnMilestone, forKey: "notifyOnMilestone") }
+    }
+
     // Launch at login
     @Published var launchAtLogin: Bool {
         didSet {
@@ -72,6 +85,14 @@ class Settings: ObservableObject {
         self.notifyOnRelease = UserDefaults.standard.bool(forKey: "notifyOnRelease")
         self.notifyOnStar = UserDefaults.standard.bool(forKey: "notifyOnStar")
         self.notifyOnIssue = UserDefaults.standard.bool(forKey: "notifyOnIssue")
+
+        // Pro analytics notifications (default: on for pro users)
+        if UserDefaults.standard.object(forKey: "notifyOnHealthChange") == nil { UserDefaults.standard.set(true, forKey: "notifyOnHealthChange") }
+        if UserDefaults.standard.object(forKey: "notifyOnActivitySpike") == nil { UserDefaults.standard.set(true, forKey: "notifyOnActivitySpike") }
+        if UserDefaults.standard.object(forKey: "notifyOnMilestone") == nil { UserDefaults.standard.set(true, forKey: "notifyOnMilestone") }
+        self.notifyOnHealthChange = UserDefaults.standard.bool(forKey: "notifyOnHealthChange")
+        self.notifyOnActivitySpike = UserDefaults.standard.bool(forKey: "notifyOnActivitySpike")
+        self.notifyOnMilestone = UserDefaults.standard.bool(forKey: "notifyOnMilestone")
 
         // Launch at login (default off)
         self.launchAtLogin = UserDefaults.standard.bool(forKey: "launchAtLogin")

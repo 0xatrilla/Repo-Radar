@@ -23,9 +23,14 @@ struct ProPaywallView: View {
 
                     VStack(alignment: .leading, spacing: 10) {
                         Label("Track unlimited repositories", systemImage: "infinity")
+                        Label("Advanced analytics dashboard", systemImage: "chart.bar")
+                        Label("Repository health & performance metrics", systemImage: "heart")
+                        Label("Activity trends & growth tracking", systemImage: "trending.up")
+                        Label("Custom reports & team insights", systemImage: "doc.text")
+                        Label("Real-time monitoring & alerts", systemImage: "bell.badge")
+                        Label("Multi-platform support (GitLab, Bitbucket)", systemImage: "cloud")
                         Label("Exclusive color & gradient themes", systemImage: "paintpalette")
-                        Label("Smart notifications (releases, stars, issues)", systemImage: "bell")
-                        Label("Faster refresh & priority features", systemImage: "bolt")
+                        Label("Priority support & early access", systemImage: "crown")
                     }
                     .font(.body)
 
@@ -39,7 +44,7 @@ struct ProPaywallView: View {
                             Text("• Title: Repo Radar Pro")
                             Text("• Duration: Monthly subscription")
                             Text("• Price: $2.99 per month")
-                            Text("• Content: Unlimited repository tracking, premium themes, advanced notifications")
+                            Text("• Content: Unlimited repos, advanced analytics, custom reports, real-time monitoring, multi-platform support, premium themes")
                         }
                         .font(.caption)
                         .foregroundColor(.secondary)

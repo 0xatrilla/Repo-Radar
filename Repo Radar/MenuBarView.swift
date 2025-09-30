@@ -95,6 +95,7 @@ private func gradientText(_ text: String, theme: AppTheme, font: Font) -> some V
 
 struct MenuBarView: View {
     @ObservedObject var viewModel: RepoRadarViewModel
+    @ObservedObject private var pro = ProManager.shared
     @Environment(\.openWindow) private var openWindow
     @State private var showingAddRepo = false
     @State private var newRepoInput = ""
@@ -215,6 +216,25 @@ struct MenuBarView: View {
                         }
                     }
                     .buttonStyle(.plain)
+
+                    Button(action: {
+                        if pro.isSubscribed {
+                            NSApplication.shared.activate(ignoringOtherApps: true)
+                            openWindow(id: "analytics")
+                            bringWindowToFront(title: "Analytics Dashboard")
+                        } else {
+                            NSApplication.shared.activate(ignoringOtherApps: true)
+                            openWindow(id: "pro")
+                            bringWindowToFront(title: "Get Pro")
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: pro.isSubscribed ? "chart.bar" : "lock")
+                            Text("Analytics")
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(pro.isSubscribed ? 1.0 : 0.5)
 
                     Button(action: {
                         NSApplication.shared.activate(ignoringOtherApps: true)
@@ -422,7 +442,7 @@ struct SettingsSheet: View {
     @Binding var isPresented: Bool
     @State private var verifyMessage: String?
     @State private var verifying = false
-    private let service = GitHubService()
+    private let service = RepositoryServiceFactory.createService(for: .github)
     @ObservedObject private var pro = ProManager.shared
     @Environment(\.openWindow) private var openWindow
 
@@ -580,13 +600,13 @@ struct SettingsSheet: View {
     private func saveAndVerify() async {
         verifying = true
         verifyMessage = nil
-        service.setPersonalAccessToken(settings.personalAccessToken)
+        service.setAccessToken(settings.personalAccessToken)
         do {
             let user = try await service.verifyToken()
             verifyMessage = "Token verified for @\(user)"
-        } catch GitHubError.invalidToken {
+        } catch ServiceError.invalidToken {
             verifyMessage = "Invalid token"
-        } catch GitHubError.rateLimited {
+        } catch ServiceError.rateLimited {
             verifyMessage = "Rate limited; try later"
         } catch {
             verifyMessage = error.localizedDescription
@@ -599,7 +619,7 @@ struct SettingsWindowView: View {
     @StateObject private var settings = Settings.shared
     @State private var verifyMessage: String?
     @State private var verifying = false
-    private let service = GitHubService()
+    private let service = RepositoryServiceFactory.createService(for: .github)
     @ObservedObject private var pro = ProManager.shared
     @Environment(\.openWindow) private var openWindow
 
@@ -740,13 +760,13 @@ struct SettingsWindowView: View {
         verifying = true
         verifyMessage = nil
         let token = settings.personalAccessToken
-        service.setPersonalAccessToken(token)
+        service.setAccessToken(token)
         do {
             let user = try await service.verifyToken()
             verifyMessage = "Token verified for @\(user)"
-        } catch GitHubError.invalidToken {
+        } catch ServiceError.invalidToken {
             verifyMessage = "Invalid token"
-        } catch GitHubError.rateLimited {
+        } catch ServiceError.rateLimited {
             verifyMessage = "Rate limited; try later"
         } catch {
             verifyMessage = error.localizedDescription
@@ -758,13 +778,13 @@ struct SettingsWindowView: View {
 struct ImportMyReposView: View {
     @ObservedObject var viewModel: RepoRadarViewModel
     @Binding var isPresented: Bool
-    @State private var repos: [GitHubService.UserRepoSummary] = []
-    @State private var selected: Set<Int> = []
+    @State private var repos: [RepositoryInfo] = []
+    @State private var selected: Set<UUID> = []
     @State private var search = ""
     @State private var isLoading = true
     @State private var errorMessage: String?
 
-    var filtered: [GitHubService.UserRepoSummary] {
+    var filtered: [RepositoryInfo] {
         if search.isEmpty { return repos }
         return repos.filter { $0.fullName.localizedCaseInsensitiveContains(search) }
     }
@@ -802,7 +822,7 @@ struct ImportMyReposView: View {
                     } else {
                         ScrollView {
                             VStack(alignment: .leading, spacing: 6) {
-                                ForEach(filtered, id: \.id) { repo in
+                                ForEach(Array(filtered.enumerated()), id: \.element.id) { index, repo in
                                     HStack {
                                         Toggle(isOn: Binding(
                                             get: { selected.contains(repo.id) },
@@ -815,13 +835,13 @@ struct ImportMyReposView: View {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(repo.fullName)
                                                 .font(.system(size: 12, weight: .medium))
-                                            Text("★ \(repo.stargazersCount)")
+                                            Text("★ \(repo.starCount)")
                                                 .font(.system(size: 11))
                                                 .foregroundColor(.gray)
                                         }
                                         Spacer()
                                         Button("Open") {
-                                            if let url = URL(string: repo.htmlUrl) { NSWorkspace.shared.open(url) }
+                                            if let url = URL(string: repo.url) { NSWorkspace.shared.open(url) }
                                         }
                                         .buttonStyle(.link)
                                     }
@@ -853,9 +873,9 @@ struct ImportMyReposView: View {
         defer { isLoading = false }
         do {
             repos = try await viewModel.listMyRepos()
-        } catch GitHubError.invalidToken {
+        } catch ServiceError.invalidToken {
             errorMessage = "Invalid Personal Access Token."
-        } catch GitHubError.rateLimited {
+        } catch ServiceError.rateLimited {
             errorMessage = "Rate limited. Add/refresh your PAT in Settings."
         } catch let e {
             errorMessage = e.localizedDescription
@@ -865,7 +885,7 @@ struct ImportMyReposView: View {
     private func importSelected() async {
         let toImport = repos.filter { selected.contains($0.id) }
         for repo in toImport {
-            let owner = repo.owner.login
+            let owner = repo.owner
             let name = repo.name
             await viewModel.addRepository(from: "\(owner)/\(name)")
         }

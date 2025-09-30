@@ -64,6 +64,11 @@ struct Repo_RadarApp: App {
             ProPaywallView()
                 .frame(width: 520, height: 520)
         }
+
+        Window("Analytics Dashboard", id: "analytics") {
+            AnalyticsDashboardView()
+                .frame(width: 900, height: 700)
+        }
     }
 }
 
